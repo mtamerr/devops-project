@@ -1,0 +1,51 @@
+---
+- name: Deploy Python Flask app with Docker
+  hosts: localhost
+  become: true
+  vars:
+    app_dir: "/home/{{ lookup('env','USER') }}/python-app"
+
+  tasks:
+    - name: Ensure Docker Compose is installed
+      command: docker compose version
+      register: docker_compose_check
+      ignore_errors: true
+
+    - name: Install Docker Compose if not installed
+      apt:
+        name: docker-compose-plugin
+        state: present
+      when: docker_compose_check.failed
+
+    - name: Ensure app directory exists
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+
+    - name: Copy docker-compose.yml to host
+      copy:
+        src: ./docker-compose.yml
+        dest: "{{ app_dir }}/docker-compose.yml"
+
+    - name: Copy Dockerfile to host
+      copy:
+        src: ./Dockerfile
+        dest: "{{ app_dir }}/Dockerfile"
+
+    - name: Copy app files to host
+      copy:
+        src: ./app/
+        dest: "{{ app_dir }}/app/"
+        mode: '0755'
+      ignore_errors: yes
+
+    - name: Copy requirements.txt to host
+      copy:
+        src: ./requirements.txt
+        dest: "{{ app_dir }}/requirements.txt"
+
+    - name: Build and start Flask app with Docker Compose
+      command: docker-compose -f "{{ app_dir }}/docker-compose.yml" up -d --build
+      args:
+        chdir: "{{ app_dir }}"
+
